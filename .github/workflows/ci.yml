@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Set up Python
+        run: uv python install 3.11
+      # The tested modules are pure Python by design (no torch/trl/vllm
+      # imports), so CI installs only what the tests actually need and skips
+      # the multi-gigabyte GPU stack entirely.
+      - name: Install
+        run: |
+          uv venv
+          uv pip install --python .venv/bin/python pytest ruff pydantic pyyaml
+      - name: Ruff
+        run: .venv/bin/ruff check src tests scripts
+      - name: Pytest
+        run: PYTHONPATH=src .venv/bin/python -m pytest -q
