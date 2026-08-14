@@ -26,6 +26,7 @@ os.environ.setdefault("UNSLOTH_VLLM_STANDBY", "1")
 import mlflow
 import unsloth  # noqa: F401  (import first so its patches land)
 from datasets import Dataset
+from transformers.trainer_utils import get_last_checkpoint
 from trl import GRPOConfig, GRPOTrainer
 from unsloth import FastLanguageModel
 
@@ -85,6 +86,12 @@ def main() -> None:
         seed=config.seed,
         logging_steps=1,
         report_to=[],
+        # GRPO's default run is short (max_steps=250) and hosted GPU sessions
+        # can end without warning, so checkpoint finely enough that losing a
+        # session costs a handful of steps, not the whole run.
+        save_strategy="steps",
+        save_steps=50,
+        save_total_limit=3,
     )
 
     trainer = GRPOTrainer(
@@ -95,6 +102,13 @@ def main() -> None:
         train_dataset=dataset,
     )
 
+    # Auto-resume from the last checkpoint if this script was killed mid-run.
+    last_checkpoint = None
+    if Path(config.grpo.output_dir).exists():
+        last_checkpoint = get_last_checkpoint(str(config.grpo.output_dir))
+    if last_checkpoint:
+        print(f"Resuming from checkpoint: {last_checkpoint}")
+
     if config.mlflow.tracking_uri:
         mlflow.set_tracking_uri(config.mlflow.tracking_uri)
     mlflow.set_experiment(config.mlflow.experiment)
@@ -102,7 +116,7 @@ def main() -> None:
     with mlflow.start_run(run_name=f"{config.experiment_name}-grpo"):
         mlflow.log_param("stage", "grpo")
         mlflow.log_params(config.model_dump(mode="json", exclude={"mlflow"}))
-        result = trainer.train()
+        result = trainer.train(resume_from_checkpoint=last_checkpoint)
         mlflow.log_metrics({f"train_{k}": v for k, v in result.metrics.items()})
         trainer.save_model(str(config.grpo.output_dir))
         mlflow.log_artifacts(str(config.grpo.output_dir), artifact_path="grpo_adapter")
