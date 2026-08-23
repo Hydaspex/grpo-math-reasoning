@@ -148,6 +148,11 @@ def main() -> None:
                 model_path,
                 records,
                 config.model.max_seq_length,
+                # Match the training-time completion budget. The old default
+                # (256) truncated verbose chain-of-thought before the <answer>
+                # block, so strict scoring would count a nearly-correct answer
+                # as wrong purely because generation was cut short.
+                max_new_tokens=config.grpo.max_completion_length,
                 batch_size=args.batch_size,
             )
             metrics = score(predictions, golds)

@@ -147,18 +147,33 @@ def test_last_number_beats_first_for_chain_of_thought():
     assert last_number(cot) == 72.0
 
 
-def test_extract_answer_prefers_the_answer_block():
+def test_extract_answer_reads_only_the_answer_block():
+    # The 24 in the reasoning must be ignored; only the <answer> value counts.
     text = "I computed 24 along the way.\n<answer>\n72\n</answer>"
     assert extract_answer(text) == 72.0
+
+
+def test_extract_answer_is_none_without_an_answer_block():
+    # No <answer> block -> no answer. Previously this fell back to the last
+    # number in the text, which spuriously scored truncated reasoning correct.
+    assert extract_answer("First 48/2 = 24, then 24 * 3 = 72") is None
 
 
 def test_numeric_match_tolerates_commas():
     assert numeric_match("<answer>\n1,200\n</answer>", "1200")
 
 
+def test_numeric_match_is_false_without_an_answer_block():
+    # The gold value appears in the reasoning, but there is no <answer> block,
+    # so a strict scorer must count it wrong.
+    assert not numeric_match("the answer is clearly 5 here", "5")
+
+
 def test_score_reports_accuracy_and_format():
+    # "just 5" has the right number but no <answer> block: wrong under strict
+    # scoring, so accuracy is 0.5, not 1.0.
     metrics = score([WELL_FORMED, "just 5"], ["72", "5"])
-    assert metrics["accuracy"] == 1.0
+    assert metrics["accuracy"] == 0.5
     assert metrics["format_valid"] == 0.5
 
 
