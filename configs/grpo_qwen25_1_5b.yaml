@@ -42,7 +42,10 @@ grpo:
   learning_rate: 0.000005
   num_generations: 8
   max_prompt_length: 256
-  max_completion_length: 200
+  # GSM8K chain-of-thought needs room to finish and emit the <answer> block.
+  # 200 truncated most completions mid-reasoning; 512 fits within the 1024
+  # max_seq_length alongside the 256-token prompt budget.
+  max_completion_length: 512
   max_steps: 250
   beta: 0.0
   temperature: 1.0

@@ -24,13 +24,19 @@ def last_number(text: str) -> float | None:
 
 
 def extract_answer(text: str) -> float | None:
-    """Prefer the <answer> block; fall back to the last number in the text."""
+    """Extract the answer strictly from the <answer> block.
+
+    No last-number fallback: a prediction that never emits a valid <answer>
+    block scores as wrong. The earlier fallback -- grab the last number
+    anywhere in the text -- silently inflated accuracy to ~1.0, because a
+    truncated chain of thought almost always contains the small integer that
+    GSM8K golds tend to be, so nearly any output "matched". Tying accuracy to
+    the answer contract keeps it honest and makes the format cost visible.
+    """
     tagged = extract_xml_answer(text)
     if tagged:
-        value = last_number(tagged)
-        if value is not None:
-            return value
-    return last_number(text)
+        return last_number(tagged)
+    return None
 
 
 def numeric_match(prediction: str, gold: str, relative_tolerance: float = 1e-3) -> bool:
